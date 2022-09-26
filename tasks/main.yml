@@ -1,0 +1,23 @@
+---
+# # tasks file for .
+- name: Create base network
+  include_tasks: ./ensure_network.yml
+
+- name: Create ecr repo
+  include_tasks: ./ensure_ecr.yml
+  
+- name: Build AnticProxy images
+  include_tasks: ./build_images.yml
+
+- name: Create ECS Cluster
+  include_tasks: ./ensure_ecs.yml
+
+- name: Deploy tor-snowflake
+  include_tasks: ./deploy_tor_snowflake.yml
+
+- name: Deploy signal-proxy
+  include_tasks: ./deploy_signal_proxy.yml
+
+- name: Cleanup
+  include_tasks: ./cleanup.yml
+  tags: cleanup

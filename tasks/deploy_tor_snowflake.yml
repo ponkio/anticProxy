@@ -1,0 +1,43 @@
+---
+- name: Create tor-snowflake task def
+  ecs_taskdefinition:
+    family: "tor-snowflake-taskdef"
+    task_role_arn: "{{ ecs_role.arn }}"
+    execution_role_arn: "{{ ecs_role.arn }}"
+    containers:
+    - name: "tor-snowflake"
+      essential: true
+      image: "{{ anticECR.repository.repositoryUri }}:tor-snowflake"
+      logConfiguration:
+        logDriver: awslogs
+        options:
+          awslogs-group: "anticProxy"
+          awslogs-region: "{{ cloud_config.region }}"
+          awslogs-stream-prefix: "anticProxy-tor-snowflake"
+      command: [ "-broker" , "https://snowflake-broker.torproject.net/" ]
+    launch_type: FARGATE
+    cpu: 512
+    memory: 1GB
+    state: present
+    network_mode: awsvpc
+
+- name: Create tor-snowflake service
+  ecs_service:
+    state: present
+    name: "tor-snowflake"
+    cluster: "anticProxy"
+    task_definition: "tor-snowflake-taskdef"
+    launch_type: FARGATE
+    network_configuration:
+      assign_public_ip: yes
+      subnets:
+      - "{{ cluster_subnets.results[0]['subnet']['id'] }}"
+      - "{{ cluster_subnets.results[1]['subnet']['id'] }}"
+      - "{{ cluster_subnets.results[2]['subnet']['id'] }}"
+      security_groups:
+      - "{{ anticSG.results[0]['group_id'] }}"
+    desired_count: "3"
+    region: "{{ cloud_config.region }}"
+    deployment_configuration:
+      minimum_healthy_percent: 75
+      maximum_percent: 150

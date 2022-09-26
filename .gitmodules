@@ -1,0 +1,6 @@
+[submodule "files/tor-snowflake"]
+	path = files/tor-snowflake
+	url = https://gitlab.torproject.org/tpo/anti-censorship/docker-snowflake-proxy
+[submodule "files/signal-proxy"]
+	path = files/signal-proxy
+	url = https://github.com/signalapp/Signal-TLS-Proxy

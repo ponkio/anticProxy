@@ -1,0 +1,28 @@
+---
+anticProxy_version: dev
+
+region: "us-east-1"
+
+cloud_config:
+  region: "{{ region }}"
+  vpc_cidr: "192.168.0.0/16" 
+  subnets:
+    - name: "anticVPC_subnet_a"
+      cidr: "192.168.1.0/24"
+      zone: "{{ region }}a"
+    - name: "anticVPC_subnet_b"
+      cidr: "192.168.2.0/24"
+      zone: "{{ region }}b"
+    - name: "anticVPC_subnet_c"
+      cidr: "192.168.3.0/24"
+      zone: "{{ region }}c"
+  security_groups:
+    - name: AnticProxy-SG
+      rules:
+        - proto: tcp
+          ports: 
+            - 80
+            - 443
+          cidr_ip: 0.0.0.0/0
+          rule_desc: Signal Proxy
+      description: AnticProxy security group

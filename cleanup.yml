@@ -1,0 +1,95 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: False
+  vars_files: 
+    - ./vars/main.yml
+
+  tasks:
+    - name: Delete ECS Services
+      block: 
+        - name: Scale tor-snowflake service
+          ecs_service:
+            name: "tor-snowflake"
+            cluster: "anticProxy"
+            task_definition: "tor-snowflake-taskdef"
+            desired_count: "0"
+            state: present
+          ignore_errors: True
+
+        - name: Delete tor-snowflake service
+          ecs_service:
+            name: "tor-snowflake"
+            cluster: "anticProxy"
+            state: absent
+
+        - name: Scale signal-proxy service
+          ecs_service:
+            name: "signal-proxy"
+            cluster: "anticProxy"
+            task_definition: "signal-proxy-taskdef"
+            desired_count: "0"
+            state: present
+          ignore_errors: True
+
+        - name: Delete signal-proxy service
+          ecs_service:
+            name: "signal-proxy"
+            cluster: "anticProxy"
+            state: absent
+
+    - name: Delete ECS Task Definitions
+      block: 
+    
+      - name: Delete tor-snowflake task def
+        ecs_taskdefinition: 
+          family: "tor-snowflake-taskdef"
+          state: absent
+          containers:
+            - name: "tor-snowflake"
+              # essential: true
+              # image: "{{ anticECR.repository.repositoryUri }}:tor-snowflake"
+              # logConfiguration:
+              #   logDriver: awslogs
+              #   options:
+              #     awslogs-group: "anticProxy"
+              #     awslogs-region: "{{ cloud_config.region }}"
+              #     awslogs-stream-prefix: "anticProxy-tor-snowflake"
+              # command: [ "-broker" , "https://snowflake-broker.torproject.net/" ]
+        ignore_errors: True
+
+      - name: Delete signal-proxy task def
+        ecs_taskdefinition:
+          family: "signal-proxy-taskdef"
+          containers:
+            - name: "signal-relay"
+              # essential: true
+              # image: "{{ anticECR.repository.repositoryUri }}:signal-proxy"
+              # portMappings:
+              # - containerPort: 4433
+              #   hostPort:      4433
+              # logConfiguration:
+              #   logDriver: awslogs
+              #   options:
+              #     awslogs-group: "anticProxy"
+              #     awslogs-region: "{{ cloud_config.region }}"
+              #     awslogs-stream-prefix: "anticProxy-signal-proxy"
+          state: absent
+        ignore_errors: True
+        
+    - name: Delte ELB
+      community.aws.elb_application_lb:
+        state: absent
+        name: "anticELB"
+
+    - name: Setup target group for ELB
+      community.aws.elb_target_group:
+        name: "anticProxy-targets"
+        state: absent
+
+    - name: Create a log group for the logs
+      community.aws.cloudwatchlogs_log_group:
+        retention: 30
+        region: "{{ cloud_config.region }}"
+        state: absent
+        log_group_name: "anticProxy"

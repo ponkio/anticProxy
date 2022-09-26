@@ -1,0 +1,15 @@
+---
+- name: Create ECR repository
+  community.aws.ecs_ecr:
+    name: "anticproxy"
+    region: "{{ cloud_config.region }}"
+    state: present
+  register: anticECR
+
+
+- name: Docker Login
+  shell: "aws ecr get-login-password --region {{ cloud_config.region }} | docker login --username AWS --password-stdin {{ anticECR.repository.repositoryUri | split('/') | first }}"
+  changed_when: False
+
+
+

@@ -1,0 +1,66 @@
+---
+- name: Create VPC
+  amazon.aws.ec2_vpc_net:
+    name: AnticVPC
+    cidr_block: "{{ cloud_config.vpc_cidr }}"
+    region: "{{ cloud_config.region }}"
+    tags: 
+      Name: AnticVPC
+      managed: Ansible
+    state: present
+  register: anticVPC
+    
+- name: Create Subnet
+  amazon.aws.ec2_vpc_subnet:
+    region: "{{ cloud_config.region }}"
+    az: "{{ item.zone }}"
+    vpc_id: "{{ anticVPC.vpc.id }}"
+    cidr: "{{ item.cidr }}"
+    tags:
+      Name: "{{ item.name }}"
+      managed: Ansible
+    state: present
+  with_items: "{{ cloud_config.subnets }}"
+  register: cluster_subnets
+
+- name: Create IGW
+  amazon.aws.ec2_vpc_igw:
+    region: "{{ cloud_config.region }}"
+    vpc_id: "{{ anticVPC.vpc.id }}"
+    state: present
+  register: anticVPC_igw
+
+- name: Lookup Route Tables
+  amazon.aws.ec2_vpc_route_table_info:
+    region: "{{ cloud_config.region }}"
+    filters: 
+      "tag:Name": AnticVPC
+  register: route_table_facts
+  ignore_errors: True
+
+- name: Set subnets to use route table
+  amazon.aws.ec2_vpc_route_table:
+    tags: 
+      Name: AnticVPC
+    region: "{{ cloud_config.region }}"
+    vpc_id: "{{ anticVPC.vpc.id }}"
+    subnets: 
+      - "{{ cloud_config.subnets[0].cidr }}"
+      - "{{ cloud_config.subnets[1].cidr }}"
+      - "{{ cloud_config.subnets[2].cidr }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ anticVPC_igw.gateway_id }}"
+    state: present
+  when: route_table_facts
+
+- name: Create security Groups
+  amazon.aws.ec2_group: 
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    vpc_id: "{{ anticVPC.vpc.id }}"
+    region: "{{ cloud_config.region }}"
+    rules: "{{ item.rules }}"
+    state: present
+  with_items: "{{ cloud_config.security_groups }}"
+  register: "anticSG"

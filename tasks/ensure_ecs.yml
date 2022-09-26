@@ -1,0 +1,82 @@
+---
+- name: Create ECS cluster
+  community.aws.ecs_cluster:
+    name: "anticProxy"
+    state: present
+    region: "{{ cloud_config.region }}"
+
+- name: Create iam resrouces
+  block:
+    - name: Create a role
+      iam_role:
+        name: fargate-ecs
+        assume_role_policy_document: "{{ lookup('file','./vars/fargate-role.json') }}"
+        description: Allows ECS tasks to call AWS services on your behalf.
+      register: ecs_role
+
+    - name: Create a policy
+      iam_policy:
+        iam_type: role
+        iam_name: fargate-ecs
+        policy_name: fargate-ecs
+        policy_json: " {{ lookup( 'file', './vars/fargate-policy.json') }} "
+        state: present
+
+    # - name: Create role
+    #   community.aws.iam_role:
+    #     name: fargate-ecs
+    #     assume_role_policy_document: {{ lookup('file', './vars/fargate-role.json') }}
+
+- name: Create a log group for the logs
+  community.aws.cloudwatchlogs_log_group:
+    retention: 30
+    region: "{{ cloud_config.region }}"
+    state: present
+    log_group_name: "anticProxy"
+
+
+## Needs to be done per app target needing an ELB
+- name: Setup target group for ELB
+  community.aws.elb_target_group:
+    name: "anticProxy-targets"
+    protocol: http
+    target_type: ip
+    port: 4433
+    vpc_id: "{{ anticVPC.vpc.id }}"
+    state: present
+  register: anticTG
+
+
+- debug:
+    var: anticSG
+
+
+# - name: Generate certificate request
+# - name: Modify r53 records for cert
+# - name: wait for cert to come acitve
+# - name: Get cert
+
+- name: Configure ELB
+  community.aws.elb_application_lb:
+    state: present
+    name: "anticELB"
+    scheme: internet-facing
+    security_groups:
+      - "{{ anticSG.results[0]['group_id'] }}"
+    region: "{{ cloud_config.region }}"
+    subnets:
+      - "{{ cluster_subnets.results[0]['subnet']['id'] }}"
+      - "{{ cluster_subnets.results[1]['subnet']['id'] }}"
+      - "{{ cluster_subnets.results[2]['subnet']['id'] }}"
+    listeners:
+      - Protocol: HTTPS
+        Port: 443
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "anticProxy-targets"
+        Certificates: 
+          - CertificateArn: arn:aws:acm:us-east-1:011512970419:certificate/6bf13062-04c9-4864-9b91-5b3e7a58d39a
+        SslPolicy: ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+  register: anticELB
+
+
